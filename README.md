@@ -1,2 +1,0 @@
-# psql.sh
-psql.sh
