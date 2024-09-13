@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import Image from 'next/image';
+import { useEffect, useRef, useState } from 'react';
 
 import { useXTerm } from 'react-xtermjs'
 import { neon } from '@neondatabase/serverless';
 import { FitAddon } from '@xterm/addon-fit';
+
+import neonLogo from './neon.svg';
 
 export default function Component() {
 
@@ -27,6 +30,8 @@ export default function Component() {
   const { instance, ref } = useXTerm();
   const buffer = useRef(''); // Buffer to store current command
   const isProcessing = useRef(false); // Flag to indicate if a command is currently being processed
+
+  const [isQuit, setIsQuit] = useState(false);
 
 
   function formatTable(data: any) {
@@ -83,14 +88,14 @@ export default function Component() {
     const sql = neon(CONNECTION_STRING);
     sql(actualQuery).then((result) => {
       instance?.writeln('\r\n' + formatTable(result) + '\r\n');
-      instance?.write('psql> ');
+      instance?.write('neondb=> ');
       buffer.current = '';
       isProcessing.current = false;
 
     }).catch((error) => {
       console.error(error);
-      instance?.writeln('psql> ERROR: ' + error.message);
-      instance?.write('psql> ');
+      instance?.writeln('neondb=> ERROR: ' + error.message);
+      instance?.write('neondb=> ');
       buffer.current = '';
       isProcessing.current = false;
     });
@@ -111,9 +116,13 @@ export default function Component() {
     } else if (data.charCodeAt(0) === 13) { // 13 is the ASCII code for enter
       instance?.writeln(''); // Handle enter
       if (buffer.current.trim().length > 0) {
-        runQuery();
+        if (buffer.current.trim() === '\\q') {
+          setIsQuit(true);
+        } else {
+          runQuery();
+        }
       } else {
-        instance?.write('psql> ');
+        instance?.write('neondb=> ');
       }
     } else {
       buffer.current = buffer.current + data;
@@ -122,14 +131,34 @@ export default function Component() {
   }
 
   useEffect(() => {
-    instance?.loadAddon(new FitAddon());
-    instance?.write('psql> ');
+    const fitaddon = new FitAddon();
+    instance?.loadAddon(fitaddon);
+    fitaddon.fit();
+
+    instance?.writeln('Welcome to Neon! Creating database...');
+    instance?.writeln('');
+    instance?.writeln('psql (16.4)');
+    instance?.writeln('SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, compression: off');
+    instance?.writeln('Type "help" for help.');
+    instance?.writeln('');
+    instance?.write('neondb=> ');
     instance?.onData(onData);
   }, [ref, instance]);
 
   return (
-    <div>
-      <div ref={ref} style={{ width: '', height: '100%' }} />
+    <div className='w-full h-full'>
+      {!isQuit && <div ref={ref} className='w-full h-full' />}
+      {isQuit &&
+        <div className="w-full h-full flex flex-col gap-8 justify-center items-center">
+          <Image
+            src={neonLogo}
+            width={250}
+            alt="neon logo"
+          />
+          <p>
+            Get started at <a className="text-neutral-500" href="https://neon.tech">neon.tech</a>.
+          </p>
+        </div>}
     </div>
   );
 }
